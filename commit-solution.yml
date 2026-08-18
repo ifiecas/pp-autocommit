@@ -1,0 +1,54 @@
+# ============================================================
+# Auto-commit solution to source control after deploy-to-Test
+# Queued by the OnDeploymentCompleted flow in the host env
+# See README.md for full setup instructions
+# ============================================================
+#
+# Before using:
+#   1. Replace the PowerPlatformSPN value with your service
+#      connection name
+#   2. Add a pipeline variable `solutionName` and tick
+#      "Let users override this value when running this pipeline"
+#   3. Grant your repo's Build Service identity Contribute rights
+#
+# ============================================================
+
+trigger: none   # never runs on its own — only queued by the flow
+
+pool:
+  vmImage: 'windows-latest'
+
+steps:
+  - checkout: self
+    persistCredentials: true   # lets the git push step authenticate
+    fetchDepth: 0              # full history so branch operations behave
+
+  - task: PowerPlatformToolInstaller@2
+    displayName: 'Install Power Platform tools'
+
+  - task: PowerPlatformExportSolution@2
+    displayName: 'Export solution from dev'
+    inputs:
+      authenticationType: 'PowerPlatformSPN'
+      PowerPlatformSPN: 'pp-dev-serviceprincipal'   # ← your service connection name
+      SolutionName: '$(solutionName)'
+      SolutionOutputFile: '$(Build.ArtifactStagingDirectory)/$(solutionName).zip'
+      AsyncOperation: true     # avoids timeouts on larger solutions
+      MaxAsyncWaitTime: '60'
+
+  - task: PowerPlatformUnpackSolution@2
+    displayName: 'Unpack solution to readable files'
+    inputs:
+      SolutionInputFile: '$(Build.ArtifactStagingDirectory)/$(solutionName).zip'
+      SolutionTargetFolder: '$(Build.SourcesDirectory)/solutions/$(solutionName)'
+
+  - script: |
+      git config user.email "pipeline@your-devops-org"
+      git config user.name "Deploy Bot"
+      git checkout main
+      git pull origin main
+      git add solutions/
+      git commit -m "Deploy to Test: $(solutionName) (build $(Build.BuildNumber)) [skip ci]" || echo "No changes to commit"
+      git push origin main
+    displayName: 'Commit unpacked solution to main'
+    workingDirectory: '$(Build.SourcesDirectory)'
