@@ -1,0 +1,17 @@
+{
+  "_comment": "Sample body of the OnDeploymentCompleted trigger output. Note that the useful fields (ArtifactName, DeploymentStageName) live under OutputParameters, NOT InputParameters — pointing flow expressions at the wrong section is the most common reason the condition silently evaluates false.",
+  "body": {
+    "InputParameters": {
+      "StageRunId": "00000000-0000-0000-0000-000000000000",
+      "DeploymentStatus": 200000002,
+      "ErrorMessage": ""
+    },
+    "OutputParameters": {
+      "ArtifactName": "YourSolutionName",
+      "DeploymentStageName": "Dev to UAT",
+      "DeploymentPipelineName": "Your Pipeline Name"
+    },
+    "SdkMessage": "OnDeploymentCompleted",
+    "RunAsSystemUserId": "00000000-0000-0000-0000-000000000000"
+  }
+}
