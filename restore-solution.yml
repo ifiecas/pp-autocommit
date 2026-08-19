@@ -1,0 +1,67 @@
+# ============================================================
+# Restore solution from source control back into dev
+# The reverse of commit-solution.yml: pack → import → publish
+# Run MANUALLY from Azure DevOps (deliberately not automated)
+# ============================================================
+#
+# Before using:
+#   1. Replace the PowerPlatformSPN value with your service
+#      connection name (same one commit-solution.yml uses)
+#   2. Add a pipeline variable `solutionName` and tick
+#      "Let users override this value when running this pipeline"
+#
+# To run:
+#   Pipelines → this pipeline → Run pipeline →
+#   set solutionName to the solution you're restoring → Run
+#
+# Use cases:
+#   - Rollback: check out an old commit's solution state, run this,
+#     dev is back to that version
+#   - Edit-in-git: change topic text or config in the repo, run this,
+#     the edit appears in Copilot Studio
+#
+# Safety rules:
+#   - Only ever targets DEV. Never point this at test/prod — changes
+#     reach downstream environments through the normal deployment
+#     pipeline (with its approval gate and auto-commit).
+#   - This import OVERWRITES dev. If someone edited the agent in dev
+#     since the commit you're restoring, their changes are gone.
+#     Restoring is a deliberate act — consider adding a DevOps
+#     environment approval to this pipeline for shared dev envs.
+#   - Safe edits in git: human-readable text (topic messages),
+#     boolean settings. Structural changes (new components, IDs,
+#     rewiring): do those in the maker portal instead.
+#   - Keep trigger: none. Auto-running this on merge to main risks
+#     a loop with the auto-commit pipeline unless carefully guarded.
+#
+# ============================================================
+
+trigger: none   # manual runs only — restoring should be deliberate
+
+pool:
+  vmImage: 'windows-latest'
+
+steps:
+  - checkout: self
+
+  - task: PowerPlatformToolInstaller@2
+    displayName: 'Install Power Platform tools'
+
+  - task: PowerPlatformPackSolution@2
+    displayName: 'Pack solution from source'
+    inputs:
+      SolutionSourceFolder: '$(Build.SourcesDirectory)/solutions/$(solutionName)'
+      SolutionOutputFile: '$(Build.ArtifactStagingDirectory)/$(solutionName).zip'
+
+  - task: PowerPlatformImportSolution@2
+    displayName: 'Import into dev'
+    inputs:
+      authenticationType: 'PowerPlatformSPN'
+      PowerPlatformSPN: 'pp-dev-serviceprincipal'   # ← your service connection name
+      SolutionInputFile: '$(Build.ArtifactStagingDirectory)/$(solutionName).zip'
+
+  - task: PowerPlatformPublishCustomizations@2
+    displayName: 'Publish customizations'
+    inputs:
+      authenticationType: 'PowerPlatformSPN'
+      PowerPlatformSPN: 'pp-dev-serviceprincipal'   # ← your service connection name
